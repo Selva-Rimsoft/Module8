@@ -1,0 +1,95 @@
+---
+output: html_document
+---
+###Practical Machine Learning Course Project - Assignment
+##### Created by: Selva
+
+### Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+### Data 
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+We begin by loading in the mtcars dataset and transforming certain variables into factors.
+
+```{r}
+library(AppliedPredictiveModeling)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(e1071)
+```
+### Getting Data 
+
+```{r}
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training <- read.csv(url(trainUrl), na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+```
+
+```{r}
+inTrain <- createDataPartition(y=training$classe, p=0.6, list=FALSE)
+myTraining <- training[inTrain, ]; myTesting <- training[-inTrain, ]
+dim(myTraining); dim(myTesting)
+```
+
+###Cleaning Data
+
+The following transformations were used to clean the data:
+
+Transformation 1: Cleaning NearZeroVariance Variables Run this code to view possible NZV Variables:
+
+```{r}
+myDataNZV <- nearZeroVar(myTraining, saveMetrics=TRUE)
+```
+
+```{r}
+trainingV3 <- myTraining #creating another subset to iterate in loop
+for(i in 1:length(myTraining)) { #for every column in the training dataset
+        if( sum( is.na( myTraining[, i] ) ) /nrow(myTraining) >= .6 ) { #if n?? NAs > 60% of total observations
+        for(j in 1:length(trainingV3)) {
+            if( length( grep(names(myTraining[i]), names(trainingV3)[j]) ) ==1)  { #if the columns are the same:
+                trainingV3 <- trainingV3[ , -j] #Remove that column
+            }   
+        } 
+    }
+}
+#To check the new N?? of observations
+dim(trainingV3)
+```
+### Using ML algorithms for prediction: Decision Tree
+```{r}
+dim(testing)
+for (i in 1:length(testing) ) {
+        for(j in 1:length(myTraining)) {
+        if( length( grep(names(myTraining[i]), names(testing)[j]) ) ==1)  {
+            class(testing[j]) <- class(myTraining[i])
+        }      
+    }      
+}
+
+testing <- testing[-1,]
+
+modFitA1 <- rpart(classe ~ ., data=myTraining, method="class")
+
+predictionsA1 <- predict(modFitA1, myTesting, type = "class")
+confusionMatrix(predictionsA1, myTesting$classe)
+
+
+```
+### Conclusion
+
+Finally, using the provided Test Set out-of-sample error.
+
+Random Forest (preprocessing and cross validation) Testing Set 1: 1 - .9714 = 0.0286,
+random Forest (preprocessing and cross validation) Testing Set 2: 1 - .9634 = 0.0366,
+random Forest (preprocessing and cross validation) Testing Set 3: 1 - .9655 = 0.0345,
+random Forest (preprocessing and cross validation) Testing Set 4: 1 - .9563 = 0.0437,
+Since each testing set is roughly of equal size, I decided to average the out of sample error rates derived by applying the random forest method with both preprocessing and cross validation against test sets 1-4 yielding a predicted out of sample rate of 0.03585.
+
